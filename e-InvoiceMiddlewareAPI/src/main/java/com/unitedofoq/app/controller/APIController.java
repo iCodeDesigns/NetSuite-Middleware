@@ -3,7 +3,6 @@ package com.unitedofoq.app.controller;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
-import java.net.ConnectException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.KeyManagementException;
@@ -13,10 +12,6 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.management.ServiceNotFoundException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
@@ -31,9 +26,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.springframework.retry.annotation.Retryable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
+import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,8 +35,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.HttpClientErrorException.Unauthorized;
-
 import com.google.common.io.CharStreams;
 
 import org.json.simple.JSONObject;
@@ -58,13 +49,11 @@ public class APIController {
 	CloseableHttpResponse response = null;
 
 	@RequestMapping(value = "/submitdocument", method = RequestMethod.POST)
-	@Retryable(value = { ServiceNotFoundException.class, ConnectException.class, Unauthorized.class,
-			ParseException.class, UnsupportedEncodingException.class, UnsupportedOperationException.class,
-			IOException.class }, maxAttempts = 2, backoff = @Backoff(delay = 2000))
+	@Retryable(value = { NotFoundException.class }, maxAttempts = 1, backoff = @Backoff(delay = 5000))
 	public @ResponseBody JSONObject callPost(@RequestHeader String client_id, @RequestHeader String client_secret,
 			@RequestBody String documents) throws ParseException, NoSuchAlgorithmException, KeyStoreException,
-			KeyManagementException, UnsupportedOperationException, URISyntaxException, IOException {
-		JSONObject submitionresult = null;
+			KeyManagementException, UnsupportedOperationException, URISyntaxException, IOException, NotFoundException {
+		JSONObject submitionResult = null;
 		SSLContextBuilder builder = new SSLContextBuilder();
 		builder.loadTrustMaterial(null, new TrustStrategy() {
 			@Override
@@ -92,15 +81,15 @@ public class APIController {
 
 		String accessToken = "Bearer " + getToken(client, httpPost, client_id, client_secret) + "aabb";
 		System.out.println(accessToken);
-		submitionresult = submitDocument(client, httpPost, accessToken, documents);
+		submitionResult = submitDocument(client, httpPost, accessToken, documents);
 
 		response.close();
-		return submitionresult;
+		return submitionResult;
 	}
 
 	@Recover
 	public JSONObject recover(Exception t) throws ParseException {
-		String failuer = "{\"result\":\"" + t.getStackTrace()[0] + "\"}";
+		String failuer = "{\"result\":\"" + t + "\"}";
 		JSONParser parser = new JSONParser();
 		JSONObject result = (JSONObject) parser.parse(failuer);
 		return result;
@@ -108,6 +97,7 @@ public class APIController {
 
 	private String getToken(HttpClient client, HttpPost httpPost, String clientID, String clientSecret) {
 		try {
+			JSONObject json = null;
 			httpPost.setURI(new URI(tokenUrl));
 			httpPost.setHeader("Content-type", "application/x-www-form-urlencoded");
 			List<NameValuePair> params = new ArrayList<NameValuePair>();
@@ -118,7 +108,13 @@ public class APIController {
 			httpPost.setEntity(new UrlEncodedFormEntity(params));
 
 			response = (CloseableHttpResponse) client.execute(httpPost);
-			JSONObject json = parseResponseToJsonObject(response);
+			int errorCode = response.getStatusLine().getStatusCode();
+			if(errorCode == 200) {
+				json = parseResponseToJsonObject(response);
+			}
+			else {
+				throw new NotFoundException();
+			}	
 			return json.get("access_token").toString();
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
@@ -128,7 +124,7 @@ public class APIController {
 	}
 
 	private JSONObject submitDocument(HttpClient client, HttpPost httpPost, String token, String documents)
-			throws URISyntaxException, UnsupportedOperationException, IOException, ParseException {
+			throws URISyntaxException, UnsupportedOperationException, IOException, ParseException, NotFoundException {
 		JSONObject json = null;
 
 		httpPost.setURI(new URI(subumitDocumentURL));
@@ -137,7 +133,13 @@ public class APIController {
 		httpPost.setEntity(new StringEntity(documents));
 
 		response = (CloseableHttpResponse) client.execute(httpPost);
-		json = parseResponseToJsonObject(response);
+		int errorCode = response.getStatusLine().getStatusCode();
+		if(errorCode == 200) {
+			json = parseResponseToJsonObject(response);
+		}
+		else {
+			throw new NotFoundException();
+		}
 		return json;
 	}
 
@@ -158,13 +160,5 @@ public class APIController {
 		}
 		return json;
 	}
-
-	@RequestMapping(value="/logout", method=RequestMethod.GET)  
-    public String logoutPage(HttpServletRequest request, HttpServletResponse response) {  
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();  
-        if (auth != null){      
-           new SecurityContextLogoutHandler().logout(request, response, auth);  
-        }  
-         return "redirect:/";  
-     }  
+ 
 }
