@@ -5,7 +5,6 @@ import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -37,7 +36,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.HttpClientErrorException.NotFound;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.google.common.io.CharStreams;
@@ -93,7 +91,6 @@ public class APIController {
 		}
 
 		String accessToken = "Bearer " + getToken(client, httpPost, client_id, client_secret);
-		System.out.println(accessToken);
 		submitionResult = submitDocument(client, httpPost, accessToken, documents);
 
 		response.close();

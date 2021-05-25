@@ -10,11 +10,12 @@
 	</parent>
 	<groupId>com.unitedofoq</groupId>
 	<artifactId>e-InvoiceMiddlewareAPI</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>v1.0</version>
+	<packaging>war</packaging>
 	<name>e-InvoiceMiddlewareAPI</name>
 	<description>e-Invoice Middleware API</description>
 	<properties>
-		<java.version>11</java.version>
+		<java.version>1.8</java.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -34,6 +35,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 	      <groupId>org.apache.httpcomponents</groupId>
